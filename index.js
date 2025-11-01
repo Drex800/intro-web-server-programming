@@ -1,13 +1,12 @@
-// index.js
 const express = require("express");
 const app = express();
 app.use(express.json());
 
-// Simulación de base de datos en memoria
+// 🗂 Base de datos simulada
 let tasks = [];
 let nextId = 1;
 
-// ✅ GET /tasks — obtiene todas las tareas (permite filtrar por estado)
+// ✅ GET /tasks — listar todas las tareas o filtrar por estado
 app.get("/tasks", (req, res) => {
   const { status } = req.query;
   if (status) {
@@ -17,14 +16,28 @@ app.get("/tasks", (req, res) => {
   res.json(tasks);
 });
 
-// ✅ GET /tasks/:id — obtiene una tarea por ID
+// ✅ GET /tasks/summary — debe ir ANTES que /tasks/:id
+app.get("/tasks/summary", (req, res) => {
+  const summary = { todo: 0, doing: 0, done: 0 };
+
+  tasks.forEach(t => {
+    if (t && typeof t.status === "string") {
+      const key = t.status.toLowerCase();
+      if (summary[key] !== undefined) summary[key]++;
+    }
+  });
+
+  res.json(summary);
+});
+
+// ✅ GET /tasks/:id — obtener una tarea específica
 app.get("/tasks/:id", (req, res) => {
   const task = tasks.find(t => t.id === parseInt(req.params.id));
   if (!task) return res.status(404).json({ message: "Task not found" });
   res.json(task);
 });
 
-// ✅ POST /tasks — crea una nueva tarea (status por defecto: "todo")
+// ✅ POST /tasks — crear una nueva tarea
 app.post("/tasks", (req, res) => {
   const { title, description } = req.body;
   if (!title) return res.status(400).json({ message: "Title is required" });
@@ -35,33 +48,42 @@ app.post("/tasks", (req, res) => {
     description: description || "",
     status: "todo",
   };
-
   tasks.push(newTask);
   res.status(201).json(newTask);
 });
 
-// ✅ PUT /tasks/:id — actualiza completamente una tarea
+// ✅ PUT /tasks/:id — actualizar todos los campos
 app.put("/tasks/:id", (req, res) => {
   const { title, description, status } = req.body;
   const validStatuses = ["todo", "doing", "done"];
+
   if (!title || !description || !status) {
-    return res.status(400).json({ message: "All fields (title, description, status) are required" });
+    return res
+      .status(400)
+      .json({ message: "Fields 'title', 'description', and 'status' are required" });
   }
+
   if (!validStatuses.includes(status)) {
-    return res.status(400).json({ message: "Invalid status value" });
+    return res
+      .status(400)
+      .json({ message: "Invalid status value. Must be 'todo', 'doing', or 'done'." });
   }
 
-  const index = tasks.findIndex(t => t.id === parseInt(req.params.id));
-  if (index === -1) return res.status(404).json({ message: "Task not found" });
+  const task = tasks.find(t => t.id === parseInt(req.params.id));
+  if (!task) return res.status(404).json({ message: "Task not found" });
 
-  tasks[index] = { id: tasks[index].id, title, description, status };
-  res.json(tasks[index]);
+  task.title = title;
+  task.description = description;
+  task.status = status;
+
+  res.json(task);
 });
 
-// ✅ PATCH /tasks/:id/status — cambia solo el estado de una tarea
+// ✅ PATCH /tasks/:id/status — actualizar solo el estado
 app.patch("/tasks/:id/status", (req, res) => {
   const { status } = req.body;
   const validStatuses = ["todo", "doing", "done"];
+
   if (!validStatuses.includes(status)) {
     return res.status(400).json({ message: "Invalid status value" });
   }
@@ -73,7 +95,7 @@ app.patch("/tasks/:id/status", (req, res) => {
   res.json({ id: task.id, status: task.status });
 });
 
-// ✅ DELETE /tasks/:id — elimina una tarea por ID
+// ✅ DELETE /tasks/:id — eliminar tarea
 app.delete("/tasks/:id", (req, res) => {
   const index = tasks.findIndex(t => t.id === parseInt(req.params.id));
   if (index === -1) return res.status(404).json({ message: "Task not found" });
@@ -82,15 +104,6 @@ app.delete("/tasks/:id", (req, res) => {
   res.json({ message: "Task deleted successfully" });
 });
 
-// ✅ GET /tasks/summary — retorna resumen de tareas por estado
-app.get("/tasks/summary", (req, res) => {
-  const summary = { todo: 0, doing: 0, done: 0 };
-  tasks.forEach(t => {
-    if (summary[t.status] !== undefined) summary[t.status]++;
-  });
-  res.json(summary);
-});
-
-// 🚀 Iniciar servidor
+// 🚀 Servidor
 const PORT = 3000;
 app.listen(PORT, () => console.log(`Servidor activo en http://localhost:${PORT}`));
